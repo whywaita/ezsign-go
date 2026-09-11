@@ -1,121 +1,120 @@
-# EZ Sign NFC プロトコル調査記録
+# EZ Sign NFC protocol research
 
-調査日：2026-09-10。
-通信ログ、カメラ画像、プレビューなどの検証データはリポジトリに含めない。
-本書の実機試験結果は、ローカルに保存した資料に基づく記録である。
-状態：Mac + RC-S380/S から4.2インチ4色へテスト画像と whywaita のXアイコンを書き込み、デスクビューで実表示を確認済み。
+Research date: 2026-09-10.
+Communication logs, camera images, and previews are not included in this repository.
+Hardware results in this document are based on locally retained evidence.
+Test patterns and whywaita's X profile icon were written to a 4.2-inch four-color display from a Mac through an RC-S380/S, with visual confirmation through Desk View.
 
-## 対応範囲と証拠の読み方
+## Scope and evidence labels
 
-本書は [調査ガイド](research/ai_agent_ez_sign_protocol_guide.md) に基づき、手元の実機試験と公開USBキャプチャを区別して記録する。
-**OBSERVED** は資料またはログで直接確認した事実、**REPRODUCED** は独立した実行での再現、**INFERRED** は推定、**UNKNOWN** は未確認、**CONFLICTING** は資料や条件間の不一致を表す。
-公開キャプチャでの OBSERVED は、今回の実機での表示成功を意味しない。
+This document follows the [research guide](research/ai_agent_ez_sign_protocol_guide.md) and distinguishes local hardware tests from public USB captures.
+**OBSERVED** means directly observed in a source or log; **REPRODUCED** means reproduced in an independent execution; **INFERRED** means an interpretation; **UNKNOWN** means unverified; **CONFLICTING** means sources or conditions disagree.
+An OBSERVED result from a public capture does not establish successful display output on the local device.
 
-| 対象 | 確認範囲 | 根拠 |
+| Subject | Scope | Evidence |
 | --- | --- | --- |
-| 手元の4.2インチ4色 | ユーザー申告によるモデル特定。RC-S380/S で検出、ISO-DEP 接続、選択、情報取得を2回実行 | REPRODUCED：LOCAL-42-001、LOCAL-42-002 |
-| 手元の公式アプリ | ユーザー所有の iPhone 上で動作。アプリ版と iOS 版は未取得 | UNKNOWN：次回更新時に版を記録 |
-| iPhone からの更新 | 本体を RC-S380 に載せたことのみユーザーから確認。白一色の更新成功、所要時間、画面結果は未記録 | UNKNOWN：公式アプリの完了表示と実表示を確認 |
-| 公開2.9インチ2色 | 8キャプチャの要求と応答、圧縮データ、同梱テキストとの一致を解析 | OBSERVED：PUB-*、SRC-README |
-| 4.2インチ4色の画像更新 | 4色と四隅のテスト画像、Xアイコンの転送と実表示を確認。本体を取り外さず反復更新 | REPRODUCED：LOCAL-42-PATTERN、LOCAL-42-ICON |
+| Local 4.2-inch four-color display | Model identified by the user; detection, ISO-DEP connection, selection, and information retrieval performed twice with RC-S380/S | REPRODUCED: LOCAL-42-001, LOCAL-42-002 |
+| Official app | Runs on the user's iPhone; app and iOS versions were not recorded | UNKNOWN: record versions on the next update |
+| Updates from iPhone | The user confirmed placing the display on the RC-S380; a successful white update, duration, and screen result were not recorded | UNKNOWN: check app completion and physical output |
+| Public 2.9-inch two-color captures | Requests, responses, compressed data, and accompanying text compared across eight captures | OBSERVED: PUB-*, SRC-README |
+| Local four-color updates | Four-color corner pattern and profile icon transferred and visually checked; repeated updates without removing the display | REPRODUCED: LOCAL-42-PATTERN, LOCAL-42-ICON |
 
-通信応答の確認は製品の暗号学的な真正性検証ではない。
-本調査では証明書や署名による製品認証を実施していない。
+Checking communication responses is not cryptographic product authentication.
+No certificate- or signature-based product authentication was performed.
 
-## 現行のGo実装
+## Current Go implementation
 
-現行APIの回転0（省略時）は、ユーザーの設置方向に合わせた旧回転180と同じ向きとする。
-以下の保存済みセッションの `rotation` は試験当時の値であり、変更していない。
-画素の転送順序は変更せず、描画時の基準方向を180度変更した。
+In the current API, rotation 0 (the default) produces the same orientation as rotation 180 in the earlier implementation, matching the user's display placement.
+Saved sessions retain the `rotation` value used at the time of testing.
+The rendering reference orientation changed by 180 degrees; pixel transfer order did not change.
 
-画像変換、JPEGのEXIF回転、4色減色、LZO1X圧縮、APDU、RC-S380のUSB制御、NFC-A検出、ISO-DEPの分割転送と待機延長をGoへ移植した。
-PythonプロセスやPythonパッケージは実行時に使用しない。
-USBアクセスのみCGO経由でlibusbを使用する。
-公開APIと起動手順は [README](../README.md)、転送処理は [protocol.go](../protocol.go)、リーダー制御は [internal/rcs380](../internal/rcs380/) にある。
+Image conversion, JPEG EXIF orientation, four-color quantization, LZO1X compression, APDUs, RC-S380 control, NFC-A discovery, ISO-DEP chaining, and waiting-time extension are implemented in Go.
+The runtime does not start Python or load Python packages.
+USB access uses libusb through CGO.
+See the [README](../README.md) for usage, [protocol.go](../protocol.go) for transfers, and [internal/rcs380](../internal/rcs380/) for reader control.
 
-REPRODUCED：Go CLIから180度回転したXアイコンを送信し、更新完了応答を得た（29,719 ms）。
-全APDUログ（非同梱のローカル資料） と プレビュー（非同梱のローカル資料） を保存した。
-この初回Go試験はLZO1Xのリテラルのみを使い、その後、繰り返し参照による圧縮を実装した。
-独立したlzokayデコーダーでランダム・4値・周期・単色の計1,000入力を展開し、Goの圧縮前データとの一致を確認した。
-lzokayは開発時の比較検証だけに使用した。
+REPRODUCED: the Go CLI sent the rotated profile icon and received update completion in 29,719 ms.
+The complete APDU log and preview were retained locally and are not distributed.
+This initial Go test used literal-only LZO1X streams; back-reference compression was added afterward.
+An independent lzokay decoder successfully reconstructed 1,000 random, four-value, periodic, and solid-color inputs produced by the Go compressor.
+lzokay was used only for development-time comparison.
 
-REPRODUCED：圧縮実装を含むGo HTTP APIへcurlで同じ画像を送り、HTTP 200と更新完了応答を得た（27,252 ms）。
-HTTP結果（非同梱のローカル資料） の画素データSHA-256はCLIの結果と一致した。
-UNKNOWN：Go版更新後のカメラ画像には本体が写っておらず、最新の実表示は目視確認できていない。
-以下の実画面写真は移植前のPython実装による確認結果である。
-Go版は双線形補間を使用するため、旧Pillow版との画素単位の一致は保証しない。
+REPRODUCED: curl sent the same image through the Go HTTP API with compression enabled, receiving HTTP 200 and update completion in 27,252 ms.
+The pixel-data SHA-256 in the locally retained HTTP result matched the CLI output.
+UNKNOWN: the camera frame taken after the Go update did not contain the display, so its latest physical output was not visually checked.
+The physical-display photographs discussed below belong to the earlier Python implementation.
+The Go renderer uses bilinear interpolation and does not guarantee pixel-for-pixel equality with the earlier Pillow renderer.
 
-## 4.2インチ4色の成功セッション（初期Python実装）
+## Successful four-color session with the initial implementation
 
-REPRODUCED：公式配布物の解析からPython CLIを実装し、手元の個体へ4色テスト画像とXアイコンを書き込んだ。
-初期Python実装はGoへの移植完了後に削除した。
-現行の操作手順は [README](../README.md)、実装は [protocol.go](../protocol.go) と [render.go](../render.go) にある。
-成功ログは LOCAL-42-PATTERN（非同梱のローカル資料） と LOCAL-42-ICON（非同梱のローカル資料） に全要求／応答を保存した。
+REPRODUCED: an initial Python CLI, developed from analysis of official distributions, wrote a four-color test pattern and the profile icon to the local device.
+That implementation was removed after the Go port was completed.
+Current usage is in the [README](../README.md); the implementation is in [protocol.go](../protocol.go) and [render.go](../render.go).
+LOCAL-42-PATTERN and LOCAL-42-ICON contain complete request/response logs retained locally, not distributed with the repository.
 
-| 順序 | 要求 | 手元の応答と処理 |
+| Step | Request | Local response and handling |
 | --- | --- | --- |
-| 1 | `00 20 00 01 04 20 09 12 10` | `90 00`。書き込み前のVERIFY |
+| 1 | `00 20 00 01 04 20 09 12 10` | `90 00`; VERIFY before writing |
 | 2 | `00 A4 04 00 07 D2 76 00 00 85 01 01` | `90 00` |
-| 3 | `F0 D8 01 FE 05 00 00 00 00 00` | `6A 86`。公式アプリ同様に継続 |
-| 4 | `00 D1 00 00 00` | 機種情報 + `90 00` |
-| 5 | `F0 D8 00 00 05 00 00 00 00 0E` | ASCII `4_color Screen` + `90 00` |
-| 6 | `F0 D3 00 end Lc block fragment payload` | 全断片が `90 00` |
-| 7 | `F0 D4 05 80 00` | 約0.67秒で `68 C6` |
-| 8 | `F0 D4 85 00 00` | 約24.93秒で `90 00`。その後の実画面を確認 |
+| 3 | `F0 D8 01 FE 05 00 00 00 00 00` | `6A 86`; continue as the official app does |
+| 4 | `00 D1 00 00 00` | Device information followed by `90 00` |
+| 5 | `F0 D8 00 00 05 00 00 00 00 0E` | ASCII `4_color Screen` followed by `90 00` |
+| 6 | `F0 D3 00 end Lc block fragment payload` | `90 00` for every fragment |
+| 7 | `F0 D4 05 80 00` | `68 C6` after about 0.67 seconds |
+| 8 | `F0 D4 85 00 00` | `90 00` after about 24.93 seconds; physical output checked afterward |
 
-OBSERVED：`68 C6` と `69 86` に対し、公式Android版の `_handle6986Response`（`0x7f1648`）は `F0 D4 85 00 00` を送る。
-この処理を実装すると手元の個体でも更新が完了した。
-今回成功した経路ではDEポーリングを使用していない。
-`F0 D4 85 80 00` と `F0 D4 85 00 00` は別コマンドとして記録し、混同しない。
-nfcpyの `transceive(timeout=3.0)` 呼び出しでもISO-DEPの待機時間延長処理により約25秒後に応答を受け取った。
-3秒を呼び出し全体の上限とは解釈しない。
+OBSERVED: for `68 C6` and `69 86`, the official Android app's `_handle6986Response` (`0x7f1648`) sends `F0 D4 85 00 00`.
+Implementing this behavior completed updates on the local unit.
+The successful path did not use DE polling.
+`F0 D4 85 80 00` and `F0 D4 85 00 00` are distinct commands.
+With nfcpy, even `transceive(timeout=3.0)` received a response after about 25 seconds because of ISO-DEP waiting-time extensions.
+The three-second argument is not a deadline for the entire call.
 
-REPRODUCED：画像は400×300、1画素2ビット、総量30,000バイトで、追加パディングなしで成立した。
-黒=0、白=1、黄=2、赤=3とし、左の画素から上位2ビットへ詰める。
-行は画面下端から上端へ送信する。
-テスト時のデスクビュー写真の向きを基準とし、座標原点を左上とすると、画素 `(x,y)` は `offset=(299-y)*100+x//4`、ビットシフト `6-2*(x%4)` に対応する。
-圧縮前の2,000バイトを1ブロックとし、全15ブロックを別々にLZO1X圧縮する。
-テスト画像は16 APDU、ディザリングしたアイコンは40 APDUとなった。
-アイコンの全APDU応答時間の合計は約27.05秒だった。
+REPRODUCED: the image is 400 × 300 pixels, two bits per pixel, totaling 30,000 bytes without extra padding.
+Color codes are black=0, white=1, yellow=2, and red=3; the leftmost pixel occupies the most significant two bits.
+Rows are transferred from bottom to top.
+Using the original Desk View orientation with a top-left coordinate origin, pixel `(x,y)` maps to `offset=(299-y)*100+x//4` and bit shift `6-2*(x%4)`.
+Each 2,000-byte uncompressed block is independently LZO1X-compressed, giving 15 blocks.
+The test pattern required 16 APDUs and the dithered icon required 40 APDUs.
+The sum of APDU response times for the icon was about 27.05 seconds.
 
-テスト画像の実表示（非同梱のローカル資料） では、左上の黒い「1 TL」、右上の白い「2 TR」、左下の黄色い「3 BL」、右下の赤い「4 BR」を確認した。
-Xアイコンの実表示（非同梱のローカル資料） では、顔の向き、右側の「why」、左右の余白を プレビュー（非同梱のローカル資料） と照合した。
-初回のアイコン表示はカメラ基準の向きだったが、ユーザーから上下逆との指摘があったため、最終表示は `--rotate 180` で回転して再送した。
-最終状態の ログ（非同梱のローカル資料）、プレビュー（非同梱のローカル資料）、実画面（非同梱のローカル資料） を保存した。
-カメラ基準の座標順と、ユーザーから見る本体の設置方向は区別する。
-確認はデスクビュー画像の目視であり、画素単位の測色や画像一致率の計測ではない。
-元画像の青は4色ディスプレイで再現できず、減色・ディザリングされた。
-アイコンの取得元とSHA-256は 画像台帳（非同梱のローカル資料） に記録した。
+The locally retained test photograph showed black “1 TL” at top left, white “2 TR” at top right, yellow “3 BL” at bottom left, and red “4 BR” at bottom right.
+The icon photograph was compared with its preview for face orientation, the “why” lettering on the right, and side margins.
+The first icon matched the camera orientation, but the user reported that it was upside down from their position.
+It was resent with the earlier CLI's `--rotate 180` option, with the final log, preview, and photograph retained locally.
+Camera-relative coordinates and the user's physical viewing direction must be distinguished.
+Visual checking used Desk View photographs, not pixel-level color measurement or a quantified image-match score.
+The source image's blue cannot be reproduced on the four-color display and was quantized and dithered.
+The icon source and SHA-256 were recorded in a local image inventory that is not distributed.
 
-## 手元の接続環境と試験結果
+## Local connection tests
 
-OBSERVED：macOS 26.4.1（25E253）、arm64、nfcpy 1.0.4、libusb 1.0.30。
-`ioreg` で SONY RC-S380/S、USB VID:PID `054C:06C1` を確認した。
-`system_profiler SPSmartCardsDataType` の Readers は空だったが、USBアクセス可能な実行環境では nfcpy がリーダーを開けた。
-制限された実行環境では libusb の列挙結果が空になったため、その失敗をリーダー非対応とは判定しない。
+OBSERVED: macOS 26.4.1 (25E253), arm64, nfcpy 1.0.4, and libusb 1.0.30.
+`ioreg` reported SONY RC-S380/S with USB VID:PID `054C:06C1`.
+Although `system_profiler SPSmartCardsDataType` listed no readers, nfcpy could open the reader in an environment with USB access.
+libusb enumeration was empty in a restricted environment; that failure was not treated as evidence of an unsupported reader.
 
-REPRODUCED：ユーザーが本体を載せた後、リーダーを閉じて開き直した2実行で、次の結果が一致した。
-画像書き込みコマンドは送信していない。
+REPRODUCED: after the user placed the display on the reader, two runs that closed and reopened the reader produced matching results.
+These initial runs did not send image-write commands.
 
-| 項目 | 実測値 | 証拠 |
+| Item | Measured value | Evidence |
 | --- | --- | --- |
-| 検出 | `106A`、`sens_res=0400`、`sel_res=28` | LOCAL-42-001、002 |
-| NFCID1 | `4E 80 D6 1D` | LOCAL-42-001、002 |
-| 接続 | `Type4ATag`、MIU=253、FWT=0.309314秒 | LOCAL-42-001、002 |
-| SELECT 応答 | `90 00` | LOCAL-42-001、002 |
-| 情報取得応答 | 54バイトのデータ + `90 00` | LOCAL-42-001、002 |
+| Detection | `106A`, `sens_res=0400`, `sel_res=28` | LOCAL-42-001, 002 |
+| NFCID1 | `4E 80 D6 1D` | LOCAL-42-001, 002 |
+| Connection | `Type4ATag`, MIU=253, FWT=0.309314 seconds | LOCAL-42-001, 002 |
+| SELECT response | `90 00` | LOCAL-42-001, 002 |
+| Information response | 54 data bytes followed by `90 00` | LOCAL-42-001, 002 |
 
-要求は以下の順序で `Type4Tag.transceive` に渡した。
-タイムアウト引数は1.0秒とした。
-最初の実行の所要時間は SELECT が約37 ms、情報取得が約12 ms だった。
-この設定値と実測時間は、表示更新時のタイムアウトを規定しない。
+The following requests were passed to `Type4Tag.transceive` in order, with a timeout argument of 1.0 second.
+In the first run, SELECT took about 37 ms and information retrieval about 12 ms.
+Neither these measurements nor the argument specifies a display-update timeout.
 
 ```text
 00 A4 04 00 07 D2 76 00 00 85 01 01
 00 D1 00 00 00
 ```
 
-情報取得応答の全バイト列：
+Complete information response:
 
 ```text
 A0 07 F0 07 20 02 58 01 90
@@ -129,204 +128,204 @@ D1 07 01 20 00 00 00 00 00
 90 00
 ```
 
-## 通信の層
+## Communication layers
 
-| 層 | 公開キャプチャの経路 | 手元で確認した経路 | 確度 |
+The local column below describes the initial information-retrieval tests; later image-update results are documented above.
+
+| Layer | Public capture path | Initial local path | Confidence |
 | --- | --- | --- | --- |
-| ホストAPI | 公開 writer は pyscard / PC/SC を使用 | nfcpy の Type4Tag.transceive | OBSERVED：SRC-WRITER、LOCAL-42-* |
-| USB | USBPcap 内の CCID 要求と応答 | nfcpy の RC-S380 ドライバーによる直接USBアクセス | OBSERVED：PUB-*、SRC-NFCPY、LOCAL-42-* |
-| 無線 | USBログだけでは RF フレームを直接観測しない | 106 kbps Type A の検出と Type4ATag 接続 | REPRODUCED：LOCAL-42-* |
-| 装置コマンド | `00 A4`、`00 D1`、`F0 D3/D4/D8/DE` | `00 A4` と `00 D1` のみ実測 | OBSERVED：PUB-*、LOCAL-42-* |
+| Host API | Public writer uses pyscard / PC/SC | nfcpy `Type4Tag.transceive` | OBSERVED: SRC-WRITER, LOCAL-42-* |
+| USB | CCID requests and responses inside USBPcap | Direct USB through nfcpy's RC-S380 driver | OBSERVED: PUB-*, SRC-NFCPY, LOCAL-42-* |
+| Radio | USB logs do not directly capture RF frames | 106 kbps Type A discovery and Type4ATag connection | REPRODUCED: LOCAL-42-* |
+| Device commands | `00 A4`, `00 D1`, `F0 D3/D4/D8/DE` | Initially measured only `00 A4` and `00 D1` | OBSERVED: PUB-*, LOCAL-42-* |
 
-INFERRED：`FF 5C` と `FF 5D` はリーダー制御候補である。
-公開 writer もそのように分類しているが、RF側で本体に届くかはUSBログだけでは証明できない。
-RC-S380 や iPhone の装置向け送信に、そのまま加える根拠はない。
-REPRODUCED：手元では `00 20 00 01 04 20 09 12 10` を先行させるとD3が受理される。
-先行させない試行ではD8とD3が `69 85` を返した。
-公式Android版の `_PreviewPageState._checkDevice`（`0x7fbfec`）にも同じコマンドがある。
+INFERRED: `FF 5C` and `FF 5D` are candidate reader-control commands.
+The public writer classifies them that way, but USB logs alone do not establish whether they reach the display over RF.
+There is no evidence supporting their direct inclusion in RC-S380 or iPhone device-command sequences.
+REPRODUCED: D3 was accepted locally when preceded by `00 20 00 01 04 20 09 12 10`.
+Without that command, D8 and D3 returned `69 85`.
+The same command appears in the official Android app's `_PreviewPageState._checkDevice` (`0x7fbfec`).
 
-OBSERVED：Sony の配布ページでは RC-S380 の macOS ドライバーは非対応とされる。
-これは今回成功した nfcpy の直接USB経路と区別する（SRC-SONY）。
-iPhone と本体の通信を RC-S380 が受動的に傍受する機能は、本調査では確立していない。
-今回のログは iPhone の送信ログではなく、iPhone を離した後の Mac からの問い合わせである。
+OBSERVED: Sony's download page lists no macOS driver support for the RC-S380.
+That is distinct from the working direct-USB path through nfcpy (SRC-SONY).
+Passive interception of iPhone-to-display traffic with an RC-S380 was not established.
+The local logs contain Mac requests made after the iPhone was moved away, not iPhone transmissions.
 
-## 公開キャプチャの復元方法
+## Reconstructing public captures
 
-OBSERVED：対象は公開リポジトリのコミット `4a6200ef7420d42ef3274909d9bf973edcdc6458` に固定した。
-8件の `sample_log/*.pcapng` を Scapy の PcapNgReader で読み、全パケットを1始まりで採番した。
-USBPcap の BULK、転送方向、IRP の往路と復路、実データ長を確認し、空の完了通知を APDU として二重計上しなかった。
+OBSERVED: analysis was pinned to public repository commit `4a6200ef7420d42ef3274909d9bf973edcdc6458`.
+Eight `sample_log/*.pcapng` files were read with Scapy's PcapNgReader, numbering packets from 1.
+USBPcap BULK transfers, direction, outgoing/completing IRPs, and actual payload lengths were checked to avoid counting empty completion notifications as duplicate APDUs.
 
-OBSERVED：解析したデータ付き BULK は、それぞれ10バイトの CCID ヘッダーと `dwLength` バイトのデータに過不足なく一致した。
-OUT の `0x6F` を送信要求として取り出し、slot と sequence、および時系列で IN 応答に対応付けた。
-8件とも未対応要求は残らず、抽出した `F0 D3` は同梱 UTF-16 テキストと全バイト一致した。
-この結果は当該キャプチャの検証であり、一般の分割USB転送に対応する汎用パーサーの完成を意味しない。
+OBSERVED: each analyzed BULK payload exactly matched a 10-byte CCID header plus `dwLength` data bytes.
+OUT `0x6F` messages were extracted as requests and matched to IN responses using slot, sequence, and time order.
+No unmatched requests remained in any of the eight captures.
+Extracted `F0 D3` commands matched the accompanying UTF-16 text byte for byte.
+This validates those captures; it does not establish a general-purpose parser for arbitrary fragmented USB transfers.
 
-CCID の応答種別 `0x80` だけではカード応答と判定できない。
-たとえば電源投入要求への `0x80` 応答は ATR であり、末尾2バイトを SW として切り出す対象ではない（PUB-W、SRC-CCID）。
+CCID response type `0x80` alone does not identify a card APDU response.
+For example, a `0x80` response to a power-on request contains an ATR, whose final two bytes must not be interpreted as a status word (PUB-W, SRC-CCID).
 
-## 公開2.9インチ2色のセッション
+## Public 2.9-inch two-color session
 
-以下は PUB-W の観測列であり、4.2インチへの推奨送信列ではない。
-パケット番号の `要求→応答` は同一 CCID sequence の対応を表す。
-全バイト列は生キャプチャに遡れる。
+This is the observed PUB-W sequence, not a recommended sequence for the four-color display.
+Packet pairs match the same CCID sequence number.
+Full bytes can be recovered from the raw capture.
 
-| パケット | 要求または操作 | 応答 | 分類 |
+| Packets | Request or operation | Response | Classification |
 | --- | --- | --- | --- |
 | 19→22 | CCID `0x63` IccPowerOff | SlotStatus | OBSERVED |
 | 23→26 | CCID `0x62` IccPowerOn | ATR `3B 86 80 01 90 72 3C 50 52 03 D8` | OBSERVED |
 | 27→30 | CCID `0x6C` GetParameters | `11 10 01 4D 00 FE 00` | OBSERVED |
-| 31→34 | `00 20 00 01 04 20 09 12 10` | `90 00` | OBSERVED、役割 UNKNOWN |
-| 35→38 | `FF 5C 00 00 03 00 01 01` | `90 00` | OBSERVED、リーダー制御 INFERRED |
-| 39→42 | `FF 5D 00 00 01 00` | `01 01 90 00` | OBSERVED、リーダー制御 INFERRED |
-| 43→46 | `00 A4 04 00 07 D2 76 00 00 85 01 01` | `90 00` | OBSERVED、NDEF 選択 |
+| 31→34 | `00 20 00 01 04 20 09 12 10` | `90 00` | OBSERVED; role UNKNOWN |
+| 35→38 | `FF 5C 00 00 03 00 01 01` | `90 00` | OBSERVED; reader control INFERRED |
+| 39→42 | `FF 5D 00 00 01 00` | `01 01 90 00` | OBSERVED; reader control INFERRED |
+| 43→46 | `00 A4 04 00 07 D2 76 00 00 85 01 01` | `90 00` | OBSERVED; NDEF selection |
 | 47→50 | `F0 D8 01 FE 05 00 00 00 00 00` | `6A 86` | OBSERVED |
-| 51→54 | `00 D1 00 00 00` | 情報データ + `90 00` | OBSERVED |
-| 55→58 | `F0 D8 00 00 05 00 00 00 00 0E` | `FF` が14バイト + `90 00` | OBSERVED、役割 UNKNOWN |
-| 59→62、63→66、67→70 | 白画像の `F0 D3` 3要求 | 各 `90 00` | OBSERVED |
-| 71→74 | `F0 D4 85 80 00` | `90 00` | OBSERVED、更新開始 INFERRED |
-| 75+4k→78+4k、k=0…34 | `F0 DE 00 00 01` | `01 90 00` | OBSERVED、処理中 INFERRED |
-| 215→218 | `F0 DE 00 00 01` | `00 90 00` | OBSERVED、完了 INFERRED |
-| 219→222 | CCID IccPowerOn | 同じ ATR | OBSERVED |
+| 51→54 | `00 D1 00 00 00` | Information followed by `90 00` | OBSERVED |
+| 55→58 | `F0 D8 00 00 05 00 00 00 00 0E` | Fourteen `FF` bytes followed by `90 00` | OBSERVED; role UNKNOWN |
+| 59→62, 63→66, 67→70 | Three white-image `F0 D3` requests | `90 00` each | OBSERVED |
+| 71→74 | `F0 D4 85 80 00` | `90 00` | OBSERVED; refresh initiation INFERRED |
+| 75+4k→78+4k, k=0…34 | `F0 DE 00 00 01` | `01 90 00` | OBSERVED; busy INFERRED |
+| 215→218 | `F0 DE 00 00 01` | `00 90 00` | OBSERVED; completion INFERRED |
+| 219→222 | CCID IccPowerOn | Same ATR | OBSERVED |
 | 223→226 | CCID IccPowerOff | SlotStatus | OBSERVED |
 
-OBSERVED：PUB-W では `F0 D4` の要求から応答まで約0.658秒、最終 `00 90 00` まで4.362134秒だった。
-`F0 DE` は36回で、通常の応答から次要求まで約0.102秒だった。
-最後の IccPowerOn 応答から IccPowerOff 要求までは約10秒ある。
-USBログから、この時間全体の給電状態や画面の安定時刻は確定できない。
+OBSERVED: in PUB-W, the `F0 D4` response arrived after about 0.658 seconds, and the final `00 90 00` arrived 4.362134 seconds after the D4 request.
+There were 36 `F0 DE` polls, typically about 0.102 seconds from one response to the next request.
+About 10 seconds elapsed between the final IccPowerOn response and IccPowerOff request.
+USB logs alone do not establish RF power throughout that period or when the image became stable.
 
-CONFLICTING：SRC-WRITER はポーリングを最大30回、間隔0.5秒で実装しているが、公開キャプチャの回数と間隔は異なる。
-同実装は非 `9000` 応答を警告して続行し、ポーリング打ち切り後も `Done.` を表示する。
-その文字列を更新成功判定として使わない。
+CONFLICTING: SRC-WRITER implements at most 30 polls at 0.5-second intervals, unlike the capture.
+It warns and continues on non-`9000` responses, and prints `Done.` even after the polling limit.
+That message must not be used as evidence of a successful update.
 
-## コマンドとフィールド
+## Commands and fields
 
-オフセットは要求 APDU 先頭から0始まり、数値バイトは16進表記とする。
-以下の固定値の確度は、列挙した証拠内での値については高い。
-独自コマンドの機能名とモデル間の互換性は別に評価する。
+Offsets are zero-based from the start of the request APDU; byte values are hexadecimal.
+Confidence in the fixed values below is high within the cited evidence.
+Proprietary command meanings and cross-model compatibility require separate evaluation.
 
-### SELECT と情報取得
+### SELECT and information retrieval
 
-| コマンド | offset:length | encoding / 値 | 意味と確度 | 証拠 |
+| Command | Offset:length | Encoding / value | Meaning and confidence | Evidence |
 | --- | --- | --- | --- | --- |
-| SELECT | 0:4 | bytes `00 A4 04 00` | ヘッダー、OBSERVED 高 | LOCAL-42-*、PUB-W |
-| SELECT | 4:1 | uint8 `07` | データ長7、OBSERVED 高 | 同上 |
-| SELECT | 5:7 | bytes `D2 76 00 00 85 01 01` | NDEF AID、OBSERVED 高 | 同上、SRC-TYPE4 |
-| 情報取得 | 0:4 | bytes `00 D1 00 00` | 情報応答を得る要求、REPRODUCED 高 | LOCAL-42-* |
-| 情報取得 | 4:1 | byte `00` | 短形式APDUの Le=256 と解釈可能、INFERRED 中 | LOCAL-42-*、PUB-W |
+| SELECT | 0:4 | bytes `00 A4 04 00` | Header; OBSERVED, high | LOCAL-42-*, PUB-W |
+| SELECT | 4:1 | uint8 `07` | Seven data bytes; OBSERVED, high | Same |
+| SELECT | 5:7 | bytes `D2 76 00 00 85 01 01` | NDEF AID; OBSERVED, high | Same, SRC-TYPE4 |
+| Information | 0:4 | bytes `00 D1 00 00` | Request returning information; REPRODUCED, high | LOCAL-42-* |
+| Information | 4:1 | byte `00` | Could be short APDU Le=256; INFERRED, medium | LOCAL-42-*, PUB-W |
 
-OBSERVED：情報応答は1バイト tag、1バイト length、length バイト value の列として末尾まで分解できる。
-次表の offset は SW を除く応答データの先頭から数え、value の位置を示す。
-型番や色数を自動判定する仕様は未確定である。
+OBSERVED: the entire information payload parses as one-byte tags, one-byte lengths, and values of that length.
+The offsets below locate values relative to the start of the response data, excluding the status word.
+A general specification for automatic model and color-count detection was not established.
 
-| tag | value offset:length | 2.9インチ2色 PUB-W | 手元の4.2インチ4色 | 意味と確度 |
+| Tag | Value offset:length | Two-color PUB-W | Local four-color unit | Meaning and confidence |
 | --- | --- | --- | --- | --- |
-| A0 | 2:7 | `F0 01 20 00 80 01 28` | `F0 07 20 02 58 01 90` | 生値 OBSERVED 高。モデル情報候補 INFERRED |
-| A1 | 11:7 | `00 12 00 30 FF FF FF` | `01 12 00 30 FF FF FF` | 生値 OBSERVED 高。先頭はAndroid実装でscanType。残りは未確定 |
-| B1 | 20:1 | `2E` | `08` | 生値 OBSERVED 高。意味 UNKNOWN |
-| B2 | 23:1 | `14` | `14` | 生値 OBSERVED 高。意味 UNKNOWN |
-| B3 | 26:1 | `00` | `00` | 生値 OBSERVED 高。意味 UNKNOWN |
-| C0 | 29:10 | ASCII `SEAA000265` | ASCII `SEAB048690` | 文字列 OBSERVED 高。製造番号候補 INFERRED |
-| C1 | 41:4 | `72 3C 50 52` | `4E 80 D6 1D` | 手元では NFCID1 と一致、REPRODUCED 高 |
-| D1 | 47:7 | `01 20 00 00 00 00 00` | 同左 | 生値 OBSERVED 高。先頭の非0はAndroid実装で圧縮有効。残りは未確定 |
+| A0 | 2:7 | `F0 01 20 00 80 01 28` | `F0 07 20 02 58 01 90` | Raw values OBSERVED, high; model information INFERRED |
+| A1 | 11:7 | `00 12 00 30 FF FF FF` | `01 12 00 30 FF FF FF` | Raw values OBSERVED, high; first byte is scanType in the Android implementation; remainder unresolved |
+| B1 | 20:1 | `2E` | `08` | Raw values OBSERVED, high; meaning UNKNOWN |
+| B2 | 23:1 | `14` | `14` | Raw values OBSERVED, high; meaning UNKNOWN |
+| B3 | 26:1 | `00` | `00` | Raw values OBSERVED, high; meaning UNKNOWN |
+| C0 | 29:10 | ASCII `SEAA000265` | ASCII `SEAB048690` | Strings OBSERVED, high; serial number INFERRED |
+| C1 | 41:4 | `72 3C 50 52` | `4E 80 D6 1D` | Matches local NFCID1; REPRODUCED, high |
+| D1 | 47:7 | `01 20 00 00 00 00 00` | Same | Raw values OBSERVED, high; nonzero first byte enables compression in Android; remainder unresolved |
 
-INFERRED：A0 の末尾4バイトを big-endian の16ビット値2個と読むと、2色例は128と296、4色実機は600と400となる。
-前者は公開2.9インチ2色の公称画素数と一致する。
-OBSERVED：公式Android版の解析では600を2で割り、width=400、height=300として保存する（STATIC-APK-127）。
-この実装では400×300の4色画面として解釈される。
-メーカー仕様としての倍長値の定義と、最終送信データの座標対応は未確定である。
-次の実験は、4.2インチ4色の入力画像寸法と展開済みデータ長を照合することとする。
+INFERRED: interpreting A0's final four bytes as two big-endian 16-bit integers gives 128 and 296 for the two-color example, and 600 and 400 for the four-color unit.
+The former matches the published two-color pixel dimensions.
+OBSERVED: the official Android implementation divides 600 by two and stores width=400, height=300 (STATIC-APK-127), interpreting this response as a four-color screen.
+The manufacturer's definition of the doubled dimension remains unresolved.
+At this stage of the investigation, coordinate mapping also remained open; the later four-color tests above establish the local mapping and data length.
 
-### F0 D8、F0 D4、F0 DE
+### F0 D8, F0 D4, and F0 DE
 
-この表は PUB-W に限定する。
-4色実機の送信結果は冒頭の成功セッションを参照する。
+This table applies only to PUB-W.
+For local four-color results, see the successful session above.
 
-| コマンド | offset:length | encoding / 値 | 解釈と確度 |
+| Command | Offset:length | Encoding / value | Interpretation and confidence |
 | --- | --- | --- | --- |
-| D8 その1 | 0:2、2:2、4:1、5:5 | bytes `F0 D8`、`01 FE`、uint8 `05`、`00 00 00 00 00` | ヘッダーと長さは OBSERVED 高。機能 UNKNOWN |
-| D8 その2 | 0:2、2:2、4:1、5:5 | bytes `F0 D8`、`00 00`、uint8 `05`、`00 00 00 00 0E` | 生値 OBSERVED 高。末尾0Eと応答14バイトの関係は INFERRED |
-| D4 | 0:2、2:2、4:1 | bytes `F0 D4`、`85 80`、`00` | 更新開始候補 INFERRED 中。P1/P2の意味 UNKNOWN |
-| DE | 0:2、2:2、4:1 | bytes `F0 DE`、`00 00`、`01` | 状態取得候補 INFERRED 中。末尾01は Le=1 候補 |
+| D8, first | 0:2, 2:2, 4:1, 5:5 | bytes `F0 D8`, `01 FE`, uint8 `05`, `00 00 00 00 00` | Header and length OBSERVED, high; function UNKNOWN |
+| D8, second | 0:2, 2:2, 4:1, 5:5 | bytes `F0 D8`, `00 00`, uint8 `05`, `00 00 00 00 0E` | Raw values OBSERVED, high; relationship between final 0E and 14 response bytes INFERRED |
+| D4 | 0:2, 2:2, 4:1 | bytes `F0 D4`, `85 80`, `00` | Refresh initiation INFERRED, medium; P1/P2 meanings UNKNOWN |
+| DE | 0:2, 2:2, 4:1 | bytes `F0 DE`, `00 00`, `01` | Status query INFERRED, medium; final 01 may be Le=1 |
 
-`F0 DE 00 00 01` は5バイトであり、末尾 `01` を「Lc=1だがデータが欠けた要求」として処理しない。
-独自要求の第5バイトを一律 Lc とするパーサーは使えない。
-`F0 D8` の応答と設定値の関係は、同一機種での取得範囲比較が次の検証対象となる。
+`F0 DE 00 00 01` is five bytes long; do not treat its final `01` as Lc=1 with missing data.
+A parser cannot interpret every proprietary request's fifth byte as Lc.
+Comparing `F0 D8` response ranges on the same model is a proposed next test for its configuration semantics.
 
-### F0 D3 の転送形式
+### F0 D3 transfer format
 
-OBSERVED：公開8キャプチャでは、次の形式で全画像データを復元できた。
-ブロック番号と断片番号の意味は、連結したデータが LZO1X として正常展開できることからの INFERRED である。
+OBSERVED: this format reconstructs all image data in the eight public captures.
+Block and fragment numbering are INFERRED from successful LZO1X decompression of concatenated payloads.
 
-| offset | length | encoding / 観測値 | 意味と確度 | 証拠 |
+| Offset | Length | Encoding / observed value | Meaning and confidence | Evidence |
 | --- | --- | --- | --- | --- |
-| 0 | 1 | byte `F0` | CLA、OBSERVED 高 | PUB-* |
-| 1 | 1 | byte `D3` | INS、OBSERVED 高 | PUB-* |
-| 2 | 1 | byte `00` | P1、意味 UNKNOWN | PUB-* |
-| 3 | 1 | uint8 `00` / `01` | P2、圧縮ブロックの非最終/最終断片候補、INFERRED 高 | PUB-* |
-| 4 | 1 | uint8、最大観測値 `FC` | Lc。常に APDU長−5、OBSERVED 高 | PUB-* |
-| 5 | 1 | uint8 `00` / `01` / `02` | 展開ブロック番号候補、INFERRED 高 | PUB-* |
-| 6 | 1 | uint8 `00`…`03` | ブロック内断片番号候補、INFERRED 高 | PUB-* |
-| 7 | Lc−2 | bytes、最大250バイト | LZO1X ストリームの断片、OBSERVED 高 | PUB-*、DEC-001 |
+| 0 | 1 | byte `F0` | CLA; OBSERVED, high | PUB-* |
+| 1 | 1 | byte `D3` | INS; OBSERVED, high | PUB-* |
+| 2 | 1 | byte `00` | P1; meaning UNKNOWN | PUB-* |
+| 3 | 1 | uint8 `00` / `01` | P2; nonfinal/final fragment of compressed block INFERRED, high | PUB-* |
+| 4 | 1 | uint8, observed maximum `FC` | Lc, always APDU length minus 5; OBSERVED, high | PUB-* |
+| 5 | 1 | uint8 `00` / `01` / `02` | Uncompressed block index INFERRED, high | PUB-* |
+| 6 | 1 | uint8 `00`…`03` | Fragment index within block INFERRED, high | PUB-* |
+| 7 | Lc−2 | bytes, at most 250 | LZO1X stream fragment; OBSERVED, high | PUB-*, DEC-001 |
 
-OBSERVED：最後の断片でも250バイトの圧縮データを持つ例がある（PUB-C、パケット83）。
-したがって長さだけでは最終断片を判定できない。
-P2=`01` も画像全体の最後ではなく、各圧縮ブロックの最後に現れる。
-番号の上限、周回、再送、欠落時の動作は UNKNOWN とし、4.2インチや大きな入力で確認する。
+OBSERVED: a final fragment can contain 250 compressed bytes (PUB-C, packet 83), so length alone does not identify the final fragment.
+P2=`01` marks the end of each compressed block, not just the final block of the image.
+Index limits, wraparound, retransmission, and missing-fragment behavior remain UNKNOWN and require further testing on larger inputs.
 
-## 画像の圧縮と配置
+## Image compression and layout
 
-OBSERVED：各 `F0 D3` の offset 7 以降を offset 5 の番号ごとに送信順で連結し、LZO 2.10 の `lzo1x_decompress_safe` で展開した。
-公開8画像の全24ブロックで戻り値0となり、実際の出力長は順に2,000、2,000、736バイトだった（DEC-001）。
-圧縮ライブラリーに渡した出力バッファーの容量ではなく、返された出力長を使った。
-画像全体は4,736バイトで、`296 × 128 ÷ 8` に一致する。
+OBSERVED: bytes from offset 7 of each `F0 D3` request were concatenated in transmission order by the index at offset 5, then decompressed with LZO 2.10 `lzo1x_decompress_safe`.
+All 24 blocks across eight images returned zero, with actual output lengths of 2,000, 2,000, and 736 bytes per image (DEC-001).
+The returned output length, rather than allocated buffer capacity, was used.
+Each complete image contained 4,736 bytes, matching `296 × 128 ÷ 8`.
 
-| キャプチャ | D3要求数 | 各ブロックの圧縮長 | 展開結果または特徴 |
+| Capture | D3 requests | Compressed block lengths | Decompressed result or property |
 | --- | --- | --- | --- |
-| PUB-W | 3 | 20 / 20 / 15 | 全4,736バイトが `FF` |
-| PUB-B | 3 | 20 / 20 / 15 | 全4,736バイトが `00` |
-| PUB-HS | 3 | 20 / 20 / 15 | 全4,736バイトが `55` |
-| PUB-VS | 3 | 41 / 41 / 36 | `00` 16バイトと `FF` 16バイトが交互 |
-| PUB-C | 7 | 793 / 253 / 250 | 非単色。全3ブロック展開成功 |
-| PUB-D | 9 | 749 / 785 / 276 | 非単色。全3ブロック展開成功 |
-| PUB-H | 9 | 762 / 796 / 229 | 非単色。全3ブロック展開成功 |
-| PUB-S | 7 | 796 / 248 / 255 | 非単色。全3ブロック展開成功 |
+| PUB-W | 3 | 20 / 20 / 15 | All 4,736 bytes are `FF` |
+| PUB-B | 3 | 20 / 20 / 15 | All 4,736 bytes are `00` |
+| PUB-HS | 3 | 20 / 20 / 15 | All 4,736 bytes are `55` |
+| PUB-VS | 3 | 41 / 41 / 36 | Alternating runs of sixteen `00` and sixteen `FF` bytes |
+| PUB-C | 7 | 793 / 253 / 250 | Nonuniform; all three blocks decompressed |
+| PUB-D | 9 | 749 / 785 / 276 | Nonuniform; all three blocks decompressed |
+| PUB-H | 9 | 762 / 796 / 229 | Nonuniform; all three blocks decompressed |
+| PUB-S | 7 | 796 / 248 / 255 | Nonuniform; all three blocks decompressed |
 
-INFERRED：公開ファイル名の白と黒の対応に従うと、1ビットが白、0ビットが黒となる。
-横縞が `55`、縦縞が16バイト単位の切り替えであることは、128画素の縦方向を16バイトで格納し、296列を順に並べる形式と整合する。
-原画像と実表示を照合していないため、原点、反転、回転、MSB/LSB順は UNKNOWN とする。
-非対称の角マークと隣接1画素の比較で確定する。
+INFERRED: based on the public filenames, bit 1 represents white and bit 0 black.
+Horizontal stripes becoming `55` and vertical stripes switching every 16 bytes are consistent with 128 vertical pixels stored in 16 bytes, followed by 296 columns in sequence.
+The source images and physical display were not compared, so origin, mirroring, rotation, and MSB/LSB order remain UNKNOWN for this two-color format.
+Asymmetric corner markers and adjacent single-pixel comparisons would resolve these questions.
 
-INFERRED：2.9インチ2色の生成候補は、4,736バイトを2,000バイト単位で分割し、各ブロックを独立に LZO1X 圧縮し、圧縮結果を250バイト以下に分割して D3 に包む方式である。
-別の圧縮器が生成したストリームを装置が受理するかは未試験であり、任意画像生成の実機対応済みとはしない。
-4色実機の色符号、プレーン構造、ブロックサイズ、圧縮方式には、この2色の値を流用しない。
+INFERRED: a candidate two-color encoder splits the 4,736-byte image into 2,000-byte blocks, compresses each independently with LZO1X, fragments each stream into at most 250 bytes, and wraps them in D3 commands.
+Acceptance of another encoder's streams on the two-color hardware was not tested, so arbitrary-image support for that model is not established.
+Do not assume that its color codes, plane structure, block size, or compression scheme apply to the four-color model.
 
-## 応答、状態遷移、失敗診断
+## Responses, state transitions, and failure diagnosis
 
-| 観測または失敗位置 | 判断 | 次の処理 |
+| Observation or failure | Assessment | Next action |
 | --- | --- | --- |
-| SELECT / D1 の `90 00` | REPRODUCED：当該要求への正常応答 | 情報応答を保存。表示成功とは分ける |
-| D8その1の `6A 86` | OBSERVED：公開8キャプチャで出現し後続処理あり | この要求だけの既知挙動として扱う。全エラーを無視する実装にしない |
-| D3 / D4 の `90 00` | OBSERVED：公開キャプチャで確認 | 送信受付候補。全ブロック、状態応答、画面まで確認 |
-| DE の `01 90 00` → `00 90 00` | OBSERVED：全8件。処理中→完了は INFERRED | 4色でも同じ意味かを実表示と照合 |
-| USB列挙不可 | OBSERVED：制限環境で発生 | USBアクセス条件を確認 |
-| タグ検出不可 | OBSERVED：載せる前に発生 | 本体の配置と iPhone が離れていることを確認 |
-| タイムアウト、離脱、途中チャンク欠落 | UNKNOWN：異常系未試験 | 成功列取得後に1条件ずつ試し、途中再送を仮定しない |
-| 正常応答だが表示が変わらない | UNKNOWN：今回未評価 | 元画像、更新開始、完了応答、給電と配置を比較 |
+| SELECT / D1 returns `90 00` | REPRODUCED: normal response to that request | Save information; distinguish it from display success |
+| First D8 returns `6A 86` | OBSERVED in all eight public captures, followed by more commands | Treat as known behavior for this request only; do not ignore all errors |
+| D3 / D4 returns `90 00` | OBSERVED in public captures | Candidate acceptance; check all blocks, status, and physical output |
+| DE changes `01 90 00` → `00 90 00` | OBSERVED in all eight; busy → complete INFERRED | Compare with physical output for the four-color device |
+| USB enumeration unavailable | OBSERVED in a restricted environment | Check USB access |
+| Tag not detected | OBSERVED before placing the display | Check placement and move the iPhone away |
+| Timeout, removal, or missing fragment | UNKNOWN: fault injection not tested | Test one condition at a time after obtaining a successful sequence; do not assume partial retransmission works |
+| Normal responses without a changed display | UNKNOWN: not evaluated in these initial tests | Compare source image, refresh start, completion, power, and placement |
 
-実装候補の状態遷移は `検出 → 接続 → 選択 → 情報取得 → モデル確認 → データ転送 → 更新要求 → 完了待ち → 実表示確認 → 再接続確認` とする。
-手元で REPRODUCED なのは情報取得までと、その後の再接続である。
-以下は初期の情報取得試験の再現手順である。
-画像更新までの実装と成功列は冒頭の節を参照する。
-成功条件には、全ブロックへの応答、完了通知、期待画像への変化、再接続後の次回更新を含める。
+A candidate state machine is `detect → connect → select → read information → verify model → transfer data → request refresh → wait for completion → inspect display → verify reconnection`.
+The initial tests reproduced information retrieval and reconnection only.
+The opening sections document the subsequent successful update implementation and sequence.
+Full success criteria include responses for all blocks, completion notification, a change to the expected image, and another update after reconnection.
 
-## テストベクタと検証結果
+## Test vectors and validation
 
-### 公開白画像の全 D3 列
+### Complete D3 sequence for the public white image
 
-OBSERVED：PUB-W パケット59、63、67と一致する。
-各要求の Lc は22、22、17、APDU長は27、27、22、Lc合計は61である。
-そのうちブロック/断片番号を除く圧縮データ合計は55バイトとなる。
-この列だけでは初期化と更新完了処理を含まない。
+OBSERVED: matches PUB-W packets 59, 63, and 67.
+Lc values are 22, 22, and 17; APDU lengths are 27, 27, and 22; total Lc is 61.
+Excluding block and fragment indices, the compressed payload totals 55 bytes.
+This sequence alone does not include initialization or refresh completion.
 
 ```text
 F0 D3 00 01 16 00 00 02 FF FF FF FF FF 20 00 00 00 00 00 00 00 B1 00 00 11 00 00
@@ -334,7 +333,7 @@ F0 D3 00 01 16 01 00 02 FF FF FF FF FF 20 00 00 00 00 00 00 00 B1 00 00 11 00 00
 F0 D3 00 01 11 02 00 02 FF FF FF FF FF 20 00 00 BC 00 00 11 00 00
 ```
 
-展開した3ブロックを番号順に連結した SHA-256：
+SHA-256 of the three decompressed blocks concatenated in index order:
 
 ```text
 white: a3671594682c80e5f08721602dd0136dd1b6c099160ac98ffa6d5b2fca4ba9af
@@ -343,75 +342,75 @@ horizontal_stripes: 15ff8a0281455a6cd649e881d5a5c7511081ffa8b74314ba366b5ac8d6af
 vertical_stripes: dbb1c2a9c9fe6d6d5ef040dd83e21aac50650737ae48eb801724d2db35787985
 ```
 
-### 再検証手順
+### Revalidation procedure
 
-1. 下記コミットの生キャプチャを取得し、SHA-256を照合する。
-2. USBPcap と CCID の長さを検査し、全要求と応答を対応付ける。
-3. D3 を抽出し、各要求で `len(APDU) == 5 + APDU[4]` を検査する。
-4. 同じブロック内の断片番号が0から連続し、最後のみ P2=`01` であることを検査する。
-5. offset 7 以降を連結して LZO1X 展開し、戻り値、実出力長、上記ハッシュを照合する。
-6. 4色実機では LOCAL-42-* の2要求だけを再実行し、SW と情報応答を比較する。
+1. Download the raw captures from the pinned commit below and compare SHA-256 values.
+2. Validate USBPcap and CCID lengths and pair every request with its response.
+3. Extract D3 requests and check `len(APDU) == 5 + APDU[4]`.
+4. Check that fragment indices start at zero and are contiguous within each block, with P2=`01` only on the final fragment.
+5. Concatenate bytes from offset 7, decompress as LZO1X, and compare return codes, actual output lengths, and the hashes above.
+6. For the local four-color information test, repeat only the two LOCAL-42-* requests and compare status words and information payloads.
 
-OBSERVED：解析用の CCID 単体テストは、要求、応答、途中切断、余剰バイトの4ケースを先に記述し、未実装による失敗後に実装して成功を確認した。
-公開8件の長さ検査、要求/応答対応、同梱D3テキストとの一致、24ブロックの展開を確認した。
-これらはオフライン解析の検証であり、4色実機の表示更新テストではない。
+OBSERVED: four CCID unit tests covered a request, a response, truncation, and excess bytes; they failed before implementation and passed afterward.
+Length checks, request/response pairing, equality with accompanying D3 text, and decompression of 24 blocks passed for all eight captures.
+These are offline analysis checks, not physical four-color display-update tests.
 
-## 公式配布物から判明した4色処理
+## Four-color behavior found in official distributions
 
-OBSERVED（STATIC-APK-127）：公式配布サイトからWindows版2種とAndroid版1.2.7を取得し、Mac上で展開・静的解析した。
-取得元とSHA-256は 配布物台帳（非同梱のローカル資料）、関数アドレスと再現条件は 静的解析記録（非公開資料） に記録した。
-WindowsやAndroid端末でのアプリ実行は行っていない。
+OBSERVED (STATIC-APK-127): two Windows distributions and Android version 1.2.7 were downloaded from official distribution pages and unpacked for static analysis on a Mac.
+Sources and SHA-256 values were recorded in a local distribution inventory; function addresses and reproduction conditions are in a private static-analysis record.
+Neither the Windows nor Android app was run on its target OS for this analysis.
 
-Android実装では手元の応答を400×300、4色、scanType=1、圧縮有効と解釈する。
-4色パッキング経路のコードは黒=0、白=1、黄=2、赤=3で、4画素を上位ビットから順に1バイトへ詰める。
-黄のBMP入力はRGB `FF C0 00` と完全一致で判定する。
-2,000バイト単位のLZO1X圧縮と最大250バイトのD3断片生成も確認した。
-その後、手元の個体で同形式の画像転送と実表示を検証した（LOCAL-42-PATTERN、LOCAL-42-ICON）。
+The Android implementation interprets the local response as 400 × 300, four colors, scanType=1, with compression enabled.
+Its four-color packing path uses black=0, white=1, yellow=2, and red=3, packing four pixels per byte from the most significant bits.
+Yellow BMP input is matched against exactly RGB `FF C0 00`.
+Independent 2,000-byte LZO1X blocks and D3 fragments of at most 250 bytes were also identified.
+The same format was subsequently transferred to the local display and visually checked (LOCAL-42-PATTERN, LOCAL-42-ICON).
 
-更新関数は `F0 D4 05 80 00` を生成し、公開Windowsログの `F0 D4 85 80 00` とは異なる。
-DE問い合わせは `F0 DE 00 00 01` であり、`01 90 00` なら待機、`00 90 00` または `90 00` なら終了側へ進む。
-D4直後の同じ応答値とは扱いが異なるため、応答解釈は要求コマンドと組にする。
+The refresh function generates `F0 D4 05 80 00`, unlike `F0 D4 85 80 00` in the public Windows capture.
+The DE query is `F0 DE 00 00 01`: `01 90 00` means continue waiting, while `00 90 00` or `90 00` proceeds toward completion.
+The same response immediately after D4 is handled differently, so responses must be interpreted together with their request commands.
 
-Mac用エンコーダーと送信処理を実装し、手元の4.2インチ4色について座標変換と実画面の照合を完了した。
-他機種への一般化は未検証である。
-Windows環境はこの解析経路の前提ではない。
+An encoder and sender were implemented on the Mac, and coordinate mapping was compared against the local four-color display.
+Generalization to other models remains unverified.
+A Windows environment is not required for this analysis path.
 
-## 未解決事項と次の実験
+## Open questions and next experiments
 
-| 優先度 | UNKNOWN | 最小の次実験 |
+| Priority | Question | Smallest next experiment |
 | --- | --- | --- |
-| P0 | iPhone公式アプリでの実表示成功 | 白→黒を送信し、各回の完了表示と本体の変化を確認。アプリ版、iOS版、所要時間を記録 |
-| 完了 | 手元の4色の完全な送信列 | LOCAL-42-PATTERN、LOCAL-42-ICONに全要求／応答を記録 |
-| 完了 | 手元の4色の座標対応と形式選択 | 下の行から上へ、行内は左から右、MSB側から2ビット。四隅の文字で確認 |
-| 完了 | RC-S380での更新と給電 | 16断片のテスト画像と40断片のアイコンの更新を確認 |
-| P1 | 型番情報のフィールド定義 | 同一モデルの別個体と比較し、個体依存値を分離 |
-| P1 | 途中再送と復旧 | 正常更新が安定した後に離脱1回からの復旧を試験 |
-| P2 | 長時間の反復更新 | 取り外さずテスト画像→アイコンの更新は成功。長時間の耐久試験は未実施 |
+| P0 | Successful physical output from the official iPhone app | Send white then black; record app completion, display changes, app/iOS versions, and duration |
+| Complete | Full local four-color sequence | All requests/responses recorded in LOCAL-42-PATTERN and LOCAL-42-ICON |
+| Complete | Local four-color mapping and format selection | Bottom-to-top rows, left-to-right pixels, two bits from the MSB; checked with corner labels |
+| Complete | RC-S380 updates and power delivery | Pattern with 16 fragments and icon with 40 fragments updated |
+| P1 | Model-information field definitions | Compare another unit of the same model to separate per-device values |
+| P1 | Partial retransmission and recovery | After stable normal updates, test recovery from one removal |
+| P2 | Long-running repeated updates | Pattern-to-icon updates without removal succeeded; long-duration endurance testing remains outstanding |
 
-今回の引き継ぎ：Macからの任意画像更新と実表示を確認した。
-iPhoneの通信採取は実施していない。
+Arbitrary-image updates from the Mac and physical output were confirmed during this investigation.
+iPhone traffic was not captured.
 
-## 証拠台帳と参照先
+## Evidence inventory and references
 
-| ID | 出典 |
+| ID | Source |
 | --- | --- |
-| LOCAL-42-001 | 1回目の実機ログ（非同梱のローカル資料） |
-| LOCAL-42-002 | 再接続後の実機ログ（非同梱のローカル資料） |
-| SRC-README | [公開writerの検証構成](https://github.com/hijimasa/EZ-Sign-nfc-unofficial-writer/blob/4a6200ef7420d42ef3274909d9bf973edcdc6458/README.md) |
-| SRC-WRITER | [公開writerの送信実装](https://github.com/hijimasa/EZ-Sign-nfc-unofficial-writer/blob/4a6200ef7420d42ef3274909d9bf973edcdc6458/write_known_binary.py) |
-| PUB-* | [固定コミットの生キャプチャ](https://github.com/hijimasa/EZ-Sign-nfc-unofficial-writer/tree/4a6200ef7420d42ef3274909d9bf973edcdc6458/sample_log)。IDとファイル名の対応は下表 |
-| DEC-001 | 本調査で PUB-* に適用した LZO 2.10 `lzo1x_decompress_safe` の結果。入力と復元手順は本文記載。[LZO一次資料](https://www.oberhumer.com/opensource/lzo/) |
-| SRC-USBPCAP | [USBPcap Capture format](https://desowin.org/usbpcap/captureformat.html) |
+| LOCAL-42-001 | First local hardware log; retained locally, not distributed |
+| LOCAL-42-002 | Reconnection hardware log; retained locally, not distributed |
+| SRC-README | [Public writer setup](https://github.com/hijimasa/EZ-Sign-nfc-unofficial-writer/blob/4a6200ef7420d42ef3274909d9bf973edcdc6458/README.md) |
+| SRC-WRITER | [Public writer implementation](https://github.com/hijimasa/EZ-Sign-nfc-unofficial-writer/blob/4a6200ef7420d42ef3274909d9bf973edcdc6458/write_known_binary.py) |
+| PUB-* | [Raw captures at the pinned commit](https://github.com/hijimasa/EZ-Sign-nfc-unofficial-writer/tree/4a6200ef7420d42ef3274909d9bf973edcdc6458/sample_log); filename mapping below |
+| DEC-001 | Results of LZO 2.10 `lzo1x_decompress_safe` on PUB-*; inputs and reconstruction described above. [LZO source information](https://www.oberhumer.com/opensource/lzo/) |
+| SRC-USBPCAP | [USBPcap capture format](https://desowin.org/usbpcap/captureformat.html) |
 | SRC-CCID | [USB CCID Revision 1.1](https://www.usb.org/sites/default/files/DWG_Smart-Card_CCID_Rev110.pdf) |
-| SRC-NFCPY | [nfcpy 1.0.4 RC-S380 ドライバー](https://github.com/nfcpy/nfcpy/blob/v1.0.4/src/nfc/clf/rcs380.py) |
-| SRC-TYPE4 | [nfcpy 1.0.4 Type 4 / ISO-DEP 実装](https://github.com/nfcpy/nfcpy/blob/v1.0.4/src/nfc/tag/tt4.py) |
-| SRC-SONY | [Sonyドライバー対応表](https://www.sony.co.jp/Products/felica/consumer/support/download/) |
-| SRC-PRODUCT | [メーカー2色製品仕様](https://www.santekshop.com/products/santek-ez-sign-nfc-e-paper-2-color-4-2-inch) |
-| SRC-APP | [メーカー公式アプリ案内](https://www.santekshop.com/pages/santek-ez-sign)、[FAQ](https://www.santekshop.com/pages/faqs) |
+| SRC-NFCPY | [nfcpy 1.0.4 RC-S380 driver](https://github.com/nfcpy/nfcpy/blob/v1.0.4/src/nfc/clf/rcs380.py) |
+| SRC-TYPE4 | [nfcpy 1.0.4 Type 4 / ISO-DEP implementation](https://github.com/nfcpy/nfcpy/blob/v1.0.4/src/nfc/tag/tt4.py) |
+| SRC-SONY | [Sony driver support](https://www.sony.co.jp/Products/felica/consumer/support/download/) |
+| SRC-PRODUCT | [Manufacturer's two-color product specifications](https://www.santekshop.com/products/santek-ez-sign-nfc-e-paper-2-color-4-2-inch) |
+| SRC-APP | [Official app information](https://www.santekshop.com/pages/santek-ez-sign), [FAQ](https://www.santekshop.com/pages/faqs) |
 
-生キャプチャの SHA-256（ダウンロードした原本について算出）：
+SHA-256 values calculated from the original downloaded captures:
 
-| ID | ファイル | SHA-256 |
+| ID | File | SHA-256 |
 | --- | --- | --- |
 | PUB-W | white.pcapng | `af864ce32a87108cc63fc3fddde049463d4fe3e3edbb457088aafc78b1aae254` |
 | PUB-B | black.pcapng | `599c832c4458b27ec5f24dcc0fcfe18c832701d5c269a72abe89598d61ea4c9f` |

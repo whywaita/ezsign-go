@@ -1,64 +1,64 @@
-# Linuxへの配置と実行
+# Linux deployment
 
-## 実行条件
+## Runtime requirements
 
-Raspberry Pi上のUbuntu（aarch64、カーネル `6.8.0-1064-raspi`）で、RC-S380のUSBインターフェースを `port100` ドライバーが確保する競合を確認しました。
-`port100` を外すことで問題が解消したことをユーザーが確認しています。
+On Ubuntu running on a Raspberry Pi (aarch64, kernel `6.8.0-1064-raspi`), the `port100` driver claimed the RC-S380 USB interface and prevented this program from using it.
+The user confirmed that unloading `port100` resolved the conflict.
 
-Linux arm64用にCGOを有効にしてビルドしたバイナリを配置します。
-実行環境にはlibusbが必要です。
+Deploy binaries built for Linux arm64 with CGO enabled.
+libusb is required at runtime:
 
 ```sh
 sudo apt update
 sudo apt install libusb-1.0-0
 ```
 
-## RC-S380が使用中になる場合
+## RC-S380 interface is busy
 
-次のエラーはUSBインターフェースが使用中であることを示します。
-`sudo` を付けても、ドライバーとの競合は解消しません。
+This error means that the USB interface is already in use.
+Running with `sudo` does not resolve a driver conflict.
 
 ```text
 claim RC-S380 interface: -6
 ```
 
-slideshowをCtrl+Cで停止し、ドライバーと競合プロセスを確認します。
+Stop the slideshow with Ctrl+C, then check the driver and competing processes:
 
 ```sh
 lsusb -t
 pgrep -af 'pcscd|ezsign'
 ```
 
-RC-S380の行に `Driver=port100` が表示される場合、次のコマンドでカーネルモジュールを一時的に外します。
-この操作は同じモジュールを使用するほかの機器にも影響します。
+If the RC-S380 entry shows `Driver=port100`, temporarily unload the kernel module:
 
 ```sh
 sudo modprobe -r port100
 ```
 
-別のezsignプロセスがある場合は終了させます。
-`pcscd` が機器を使用している場合は、必要に応じて `pcscd.socket` と `pcscd.service` を停止します。
-今回の環境では競合プロセスはなく、原因は `port100` でした。
+This also affects other devices using the same module.
+Stop any other ezsign processes using the reader.
+If `pcscd` is using the device, stop `pcscd.socket` and `pcscd.service` as needed.
+In the reported environment, there were no competing processes; `port100` was the cause.
 
-## slideshowの実行
+## Run the slideshow
 
-バイナリをカレントディレクトリ、画像を `images/` に配置した例です。
-HTTP APIの起動は不要です。
+This example assumes the binary is in the current directory and images are in `images/`.
+The HTTP API does not need to be running.
 
 ```sh
 sudo ./ezsign-go-slideshow -dir ./images -interval 10s
 ```
 
-`-interval` は書き込み終了後から次の開始までの待ち時間です。
-終了する場合はCtrl+Cを押します。
+`-interval` is the delay after one write finishes and before the next starts.
+Press Ctrl+C to stop.
 
-## ドライバーを戻す
+## Restore the driver
 
-slideshowを終了した後、次のコマンドで戻します。
+After stopping the slideshow, reload the module:
 
 ```sh
 sudo modprobe port100
 ```
 
-`modprobe -r` は永続的な無効化ではありません。
-再起動や機器の再接続後に競合が再発した場合は、`lsusb -t` で確認してください。
+`modprobe -r` does not permanently disable the module.
+If the conflict returns after a reboot or reconnecting the reader, check `lsusb -t` again.

@@ -1,33 +1,33 @@
-# 画像のループ書き込み
+# Slideshow
 
-`make build` で `bin/ezsign-go-slideshow` を生成します。
-Goライブラリを内包し、RC-S380へUSB接続して直接書き込みます。
-HTTP APIの起動やネットワーク接続は不要です。
-実行環境にはlibusbが必要です。
-同じリーダーへ書き込む別のCLIやAPIとは同時に実行しないでください。
+Run `make build` to generate `bin/ezsign-go-slideshow`.
+The program embeds the Go library and writes directly to the RC-S380 over USB.
+No HTTP server or network connection is required.
+libusb is required at runtime.
+Do not run another CLI or API process against the same reader at the same time.
 
 ```sh
 bin/ezsign-go-slideshow -dir /path/to/images -interval 60s
 ```
 
-指定ディレクトリ直下の `.png`、`.jpg`、`.jpeg` をファイル名順に繰り返し書き込みます。
-拡張子の大文字・小文字は区別しません。
-サブディレクトリとシンボリックリンクは対象外です。
-画像一覧は起動時に取得するため、追加した場合は再起動してください。
+The program repeatedly writes `.png`, `.jpg`, and `.jpeg` files from the specified directory in filename order.
+Extensions are case-insensitive.
+Subdirectories and symbolic links are excluded.
+The file list is read at startup; restart the program after adding files.
 
-最初の画像は起動直後に書き込みます。
-`-interval` は各書き込みの終了後から次の開始までの待ち時間です（既定60秒）。
-書き込みに約27秒かかる場合、開始間隔は約87秒です。
-失敗はログに記録し、指定時間後に次の画像へ進みます。
-Ctrl+Cで待機と書き込みを中断できます。
+The first write starts immediately.
+`-interval` is the delay between completing one write and starting the next (default: 60 seconds).
+For example, if writing takes about 27 seconds, the default produces a start-to-start interval of about 87 seconds.
+Failures are logged, and the program advances to the next image after the configured delay.
+Ctrl+C cancels the wait or write in progress.
 
-| フラグ | 既定値 | 内容 |
+| Flag | Default | Description |
 | --- | --- | --- |
-| `-dir` | 必須 | 画像ディレクトリ |
-| `-interval` | `60s` | 書き込み後の待ち時間 |
-| `-timeout` | `100s` | 1回の書き込みのタイムアウト |
-| `-rotate` | `0` | 現在の設置方向を基準に0または180度 |
-| `-no-dither` | `false` | ディザリングを無効にする |
+| `-dir` | Required | Image directory |
+| `-interval` | `60s` | Delay after each write |
+| `-timeout` | `100s` | Timeout for each write |
+| `-rotate` | `0` | Rotation relative to the default display orientation: 0 or 180 degrees |
+| `-no-dither` | `false` | Disable dithering |
 
 ```sh
 bin/ezsign-go-slideshow -dir /path/to/images -interval 2m -rotate 180 -no-dither
