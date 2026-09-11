@@ -1,0 +1,11 @@
+.whywaita/
+.worktrees/
+.venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+output/
+bin/
+docs/research/evidence/
+docs/research/python-reference/tests/test_evidence.py
+docs/private/
