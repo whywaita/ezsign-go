@@ -1,15 +1,14 @@
 # ezsign-go
 
-EZ Signに画像を書き込むGoライブラリです。
-画像を1枚ずつ書き込むCLI、スライドショー、HTTP APIを提供します。
+A Go library for writing images to EZ Sign displays, with a command-line tool, a slideshow program, and an HTTP API.
 
-対象はRC-S380/Sと4.2インチ4色のEZ Sign（400×300ピクセル）です。
-PNGとJPEGに対応し、画像の拡縮と4色への減色を行います。
+Supports the RC-S380/S reader and the 4.2-inch, four-color EZ Sign display (400 × 300 pixels).
+PNG and JPEG images are resized and converted to the display's four-color palette.
 
-## インストール
+## Installation
 
-Go 1.27.1以降、Cコンパイラー、libusbの開発パッケージが必要です。
-libusbをインストールしてからビルドしてください。
+Requires Go 1.27.1 or later, a C compiler, and libusb development files.
+Install libusb before building.
 
 macOS:
 
@@ -24,47 +23,47 @@ sudo apt update
 sudo apt install build-essential libusb-1.0-0-dev
 ```
 
-リポジトリ直下で実行します。
+Run from the repository root:
 
 ```sh
 CGO_ENABLED=1 make build
 ```
 
-バイナリは `bin/` に生成されます。
-実行環境にもlibusbが必要です。
-Linuxへの配置やUSBドライバーとの競合への対処は [デプロイ手順](docs/deploy.md) を参照してください。
+Binaries are written to `bin/`.
+libusb is also required at runtime.
+See [deployment](docs/deploy.md) for Linux setup and USB driver conflicts.
 
-## 使い方
+## Usage
 
-RC-S380をUSB接続し、EZ Signを載せます。
-同じリーダーを使用するプログラムは1つずつ実行してください。
+Connect the RC-S380 over USB and place the EZ Sign display on the reader.
+Run only one program against the same reader at a time.
 
-### 画像を書き込む
+### Write an image
 
 ```sh
 bin/ezsign -write image.png
 ```
 
-`-write` を省略すると、画像を書き込まずにプレビューを生成します。
-上下を反転する場合は、画像パスの前に `-rotate 180` を指定します。
+Omit `-write` to generate a preview without updating the display.
+To turn the image upside down, add `-rotate 180` before the image path.
 
-### スライドショーを表示する
+### Run a slideshow
 
 ```sh
 bin/ezsign-go-slideshow -dir ./images -interval 60s
 ```
 
-ディレクトリ内のPNGとJPEGをファイル名順に繰り返し書き込みます。
-`-interval` は書き込み終了後から次の開始までの待ち時間です。
-Ctrl+Cで停止します。
+Writes PNG and JPEG files in filename order, repeating from the beginning after the last image.
+`-interval` sets the delay between completing one write and starting the next.
+Press Ctrl+C to stop.
 
-### HTTP APIを使う
+### Use the HTTP API
 
 ```sh
 bin/ezsign-go-api -listen 127.0.0.1:8080
 ```
 
-別のターミナルから画像を送信します。
+Send an image from another terminal:
 
 ```sh
 curl --fail-with-body --max-time 100 \
@@ -73,10 +72,10 @@ curl --fail-with-body --max-time 100 \
   http://127.0.0.1:8080/v1/image
 ```
 
-APIに認証機能はありません。
-外部へ公開する場合は、リバースプロキシなどで認証とTLSを設定してください。
+The API has no authentication.
+Configure authentication and TLS through a reverse proxy or equivalent before exposing it externally.
 
-### Goから使う
+### Use the Go library
 
 ```go
 package main
@@ -104,28 +103,28 @@ func main() {
 }
 ```
 
-`WriteImage` は `image.Image` を受け付けます。
-`Render` は機器に接続せず、プレビューと転送用データを生成します。
+`WriteImage` accepts an `image.Image`.
+`Render` generates a preview and transfer data without connecting to a reader.
 
-## ドキュメント
+## Documentation
 
-- [CLIのオプションと出力ファイル](docs/cli.md)
-- [スライドショーの設定](cmd/slideshow/README.md)
-- [HTTP APIの仕様](docs/http-api.md)
-- [Linuxへのデプロイとトラブルシューティング](docs/deploy.md)
-- [EZ Signの通信プロトコル](docs/protocol.md)
+- [CLI options and output files](docs/cli.md)
+- [Slideshow configuration](cmd/slideshow/README.md)
+- [HTTP API](docs/http-api.md)
+- [Linux deployment and troubleshooting](docs/deploy.md)
+- [EZ Sign protocol](docs/protocol.md)
 
-## 開発
+## Development
 
 ```sh
-make fmt    # コードの整形
-make check  # race検出付きテストとgo vet
-make build  # ビルド
+make fmt    # Format Go code
+make check  # Run tests with the race detector and go vet
+make build  # Build binaries
 ```
 
-不具合の報告は [Issues](https://github.com/whywaita/ezsign-go/issues) へお願いします。
-OS、機器の型番、実行コマンド、エラーメッセージを添えてください。
+Report bugs through [Issues](https://github.com/whywaita/ezsign-go/issues).
+Include your OS, device model, command, and error message.
 
-## ライセンス
+## License
 
 [MIT License](LICENSE)

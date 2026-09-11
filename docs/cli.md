@@ -1,29 +1,29 @@
-# 画像書き込みCLI
+# Image writer CLI
 
-RC-S380をUSB接続し、EZ Signを載せて実行します。
-書き込みが終わるまで本体を動かさないでください。
-同じリーダーは1つのプロセスで使用します。
+Connect the RC-S380 over USB and place the EZ Sign display on it.
+Keep the display in place until the write finishes.
+Use only one process per reader.
 
 ```sh
 bin/ezsign -write image.png
 ```
 
-書き込まずにプレビューを生成する場合は、`-write` を省略します。
+Omit `-write` to generate a preview without updating the display:
 
 ```sh
 bin/ezsign -output output/preview image.png
 ```
 
-出力先には `preview.png` と転送用の `frame.bin` を保存します。
-実機へ書き込む場合は、通信ログの `session.json` も保存します。
-フラグは画像パスの前に指定してください。
+The output directory contains `preview.png` and the transfer data in `frame.bin`.
+Device writes also produce a `session.json` communication log.
+Place flags before the image path.
 
-| フラグ | 既定値 | 内容 |
+| Flag | Default | Description |
 | --- | --- | --- |
-| `-write` | `false` | 実機へ書き込む |
-| `-output` | `output` | ファイルの出力先 |
-| `-rotate` | `0` | 基準方向からの回転角度。`0` または `180` |
-| `-no-dither` | `false` | 中間色を点描で表現する処理を無効にする |
-| `-timeout` | `90s` | 処理のタイムアウト |
+| `-write` | `false` | Write to the display |
+| `-output` | `output` | Output directory |
+| `-rotate` | `0` | Rotation relative to the default orientation: `0` or `180` |
+| `-no-dither` | `false` | Disable the dithering used to approximate intermediate colors |
+| `-timeout` | `90s` | Operation timeout |
 
-表示が上下逆になる場合は `-rotate 180` を指定します。
+Use `-rotate 180` if the image appears upside down.
