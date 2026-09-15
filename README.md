@@ -5,6 +5,14 @@ A Go library for writing images to EZ Sign displays, with a command-line tool, a
 Supports the RC-S380/S reader and the 4.2-inch, four-color EZ Sign display (400 × 300 pixels).
 PNG and JPEG images are resized and converted to the display's four-color palette.
 
+## Demo
+
+The EZ Sign display running the Go slideshow, captured at the CyberAgent booth at Go Conference 2026.
+
+![The EZ Sign display running the Go slideshow](sample/demo.gif)
+
+Full-resolution video: [@whywaita's post on X](https://x.com/whywaita/status/2098270851548537101).
+
 ## Installation
 
 Requires Go 1.27.1 or later, a C compiler, and libusb development files.
