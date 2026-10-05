@@ -120,7 +120,6 @@ func main() {
 - [Slideshow configuration](cmd/slideshow/README.md)
 - [HTTP API](docs/http-api.md)
 - [Linux deployment and troubleshooting](docs/deploy.md)
-- [EZ Sign protocol](docs/protocol.md)
 
 ## Development
 
